@@ -1,0 +1,186 @@
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+from PyQt5.QtWebEngineWidgets import *
+from PyQt5.QtGui import *
+import sys
+import os
+
+# Set the path where your images are located (ensure the 'icons' folder is in the same directory as the script)
+icons_folder = "icons/"
+
+class Browser(QMainWindow):
+    def __init__(self):
+        super(Browser, self).__init__()
+
+        # Setup central widget and browser
+        self.browser = QWebEngineView()
+        self.home_page = self.load_home_page()  # Load your custom home page
+        self.browser.setUrl(QUrl(self.home_page))  # Set custom or default home page
+        self.setCentralWidget(self.browser)
+        self.showMaximized()
+
+        # Dark mode flag
+        self.dark_mode = False
+
+        # Window title and icon (Set the browser logo on the title bar)
+        self.setWindowTitle("Unity Browser")
+        self.setWindowIcon(QIcon(self.load_pixmap(icons_folder + "browser.png")))  # Set your custom logo here
+
+        # Create a layout for the main window
+        main_layout = QVBoxLayout()
+
+        # Create custom title bar
+        self.title_bar = QWidget(self)
+        self.title_bar.setStyleSheet("background-color: #333;")
+        self.title_bar.setFixedHeight(50)  # Fixed height for title bar
+        main_layout.addWidget(self.title_bar)
+
+        # Create logo for title bar
+        self.logo_label = QLabel(self.title_bar)
+        self.logo_label.setPixmap(self.load_pixmap(icons_folder + "browser.png").scaled(50, 50, Qt.KeepAspectRatio))  # Resize logo
+        self.logo_label.move(10, 10)  # Adjust position
+
+        # Create a navigation toolbar
+        navbar = QToolBar()
+        navbar.setIconSize(QSize(24, 24))  # Set the size of icons
+        self.addToolBar(navbar)
+
+        # Back button with custom image
+        back_btn = QAction(QIcon(self.load_pixmap(icons_folder + "back.png")), "Back", self)
+        back_btn.triggered.connect(self.browser.back)
+        navbar.addAction(back_btn)
+
+        # Forward button with custom image
+        forward_btn = QAction(QIcon(self.load_pixmap(icons_folder + "forward.png")), "Forward", self)
+        forward_btn.triggered.connect(self.browser.forward)
+        navbar.addAction(forward_btn)
+
+        # Reload button with custom image
+        reload_btn = QAction(QIcon(self.load_pixmap(icons_folder + "reload.png")), "Reload", self)
+        reload_btn.triggered.connect(self.browser.reload)
+        navbar.addAction(reload_btn)
+
+        # Home button with custom image
+        home_btn = QAction(QIcon(self.load_pixmap(icons_folder + "home.png")), "Home", self)
+        home_btn.triggered.connect(self.navigate_home)
+        navbar.addAction(home_btn)
+
+        # URL bar
+        self.url_bar = QLineEdit()
+        self.url_bar.returnPressed.connect(self.navigate_to_url)
+        navbar.addWidget(self.url_bar)
+
+        # Dark mode toggle button with custom image
+        dark_mode_btn = QAction(QIcon(self.load_pixmap(icons_folder + "dark.png")), "Toggle Dark Mode", self)
+        dark_mode_btn.triggered.connect(self.toggle_dark_mode)
+        navbar.addAction(dark_mode_btn)
+
+        # Set Home Page button with custom image
+        home_set_btn = QAction(QIcon(self.load_pixmap(icons_folder + "sethomepage.png")), "Set Home Page", self)
+        home_set_btn.triggered.connect(self.set_home_page)
+        navbar.addAction(home_set_btn)
+
+        # Progress bar for loading pages
+        self.progress = QProgressBar()
+        self.progress.setMaximumHeight(10)
+        self.progress.setVisible(False)
+        navbar.addWidget(self.progress)
+
+        # Connect the progress bar with page loading status
+        self.browser.loadProgress.connect(self.update_progress)
+        self.browser.loadFinished.connect(self.hide_progress)
+
+        # Update URL bar when URL changes
+        self.browser.urlChanged.connect(self.update_url)
+
+        # Enable download functionality
+        self.browser.page().profile().downloadRequested.connect(self.download_file)
+
+        # Set the main layout
+        main_widget = QWidget()
+        main_widget.setLayout(main_layout)
+        self.setCentralWidget(main_widget)
+
+    def resizeEvent(self, event):
+        # This method will be called whenever the window is resized
+        super().resizeEvent(event)
+
+        # You no longer need to manually set the geometry of widgets with layout managers
+        self.title_bar.setFixedWidth(self.width())  # Title bar resizes with the window width
+        self.logo_label.setPixmap(self.load_pixmap(icons_folder + "browser.png").scaled(50, 50, Qt.KeepAspectRatio))
+
+        # URL bar width dynamically adjusted by layout
+        self.url_bar.setFixedWidth(self.width() - 150)
+
+        # Progress bar positioned at the bottom of the window
+        self.progress.setGeometry(0, self.height() - 10, self.width(), 10)
+
+    # Home page navigation
+    def navigate_home(self):
+        self.browser.setUrl(QUrl(self.home_page))
+
+    # Navigate to URL
+    def navigate_to_url(self):
+        url = self.url_bar.text()
+        if not url.startswith("http"):
+            url = f"https://www.google.com/search?q={url}"
+        self.browser.setUrl(QUrl(url))
+
+    # Update URL bar
+    def update_url(self, q):
+        self.url_bar.setText(q.toString())
+
+    # Toggle dark mode
+    def toggle_dark_mode(self):
+        if not self.dark_mode:
+            self.setStyleSheet("background-color: #2E2E2E; color: #FFFFFF;")
+        else:
+            self.setStyleSheet("")
+        self.dark_mode = not self.dark_mode
+
+    # Download file
+    def download_file(self, download_item):
+        save_path, _ = QFileDialog.getSaveFileName(self, "Save File", download_item.url().fileName())
+        if save_path:
+            download_item.setPath(save_path)
+            download_item.accept()
+
+    # Set custom home page
+    def set_home_page(self):
+        home_url, ok = QInputDialog.getText(self, 'Set Home Page', 'Enter the URL for the home page:')
+        if ok:
+            with open("home_page.txt", "w") as file:
+                file.write(home_url)
+            self.home_page = home_url
+
+    # Load custom or default home page
+    def load_home_page(self):
+        return "https://unitybrowser.my.canva.site/"  # Your website URL
+
+    # Update progress bar when loading a page
+    def update_progress(self, progress):
+        self.progress.setValue(progress)
+        self.progress.setVisible(True)
+
+    # Hide progress bar once page has finished loading
+    def hide_progress(self):
+        self.progress.setVisible(False)
+
+    # Load image safely with fallback
+    def load_pixmap(self, image_path):
+        pixmap = QPixmap(image_path)
+        if pixmap.isNull():
+            print(f"Error: Could not load image from {image_path}")
+            # Return a default image or empty pixmap as fallback
+            return QPixmap(50, 50)  # Empty pixmap as fallback
+        return pixmap
+
+# Main application
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    QApplication.setApplicationName("Unity Browser")
+
+    # Create and display the browser window
+    window = Browser()
+    window.show()
+    sys.exit(app.exec_())
